@@ -20,13 +20,13 @@ app.use(
 app.use(passport.initialize());
 app.use(passport.session());
 
-app.get("/secrets", (req, res) => {
-  if (req.isAuthenticated()) {
-    res.render("secrets.ejs");
-  } else {
-    res.redirect("/login");
-  }
-});
+// app.get("/secrets", (req, res) => {
+//   if (req.isAuthenticated()) {
+//     res.render("secrets.ejs");
+//   } else {
+//     res.redirect("/login");
+//   }
+// });
 
 const db = new pg.Client({
   user: "postgres",
@@ -34,10 +34,13 @@ const db = new pg.Client({
   database: "World",
   port: 5432,
 });
+
+
 const saltRound = 10;
 db.connect();
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static("public"));
+
 
 app.get("/", (req, res) => {
   res.render("home.ejs");
