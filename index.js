@@ -5,12 +5,14 @@ import bcrypt from "bcrypt";
 import session from "express-session";
 import passport from "passport";
 import { Strategy } from "passport-local";
+import env from "dotenv"
 const app = express();
 const port = 3000;
 
+env.config();
 app.use(
   session({
-    secret: "TOPSECRET",
+    secret: process.env.hide,
     resave: false,
     saveUninitialized: true,
 
