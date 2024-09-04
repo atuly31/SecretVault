@@ -23,7 +23,7 @@ app.use(
 // Declare session before creating passport very important
 app.use(passport.initialize());
 app.use(passport.session());
-
+app.set("view engine", "ejs");
 const db = new pg.Client({
   user: "postgres",
   password: "Atulyadav31",
@@ -50,12 +50,15 @@ app.get("/register", (req, res) => {
 
 app.get("/secrets", (req, res) => {
   if (req.isAuthenticated()) {
-    res.render("secrets.ejs");
+    res.render("secrets");
   } else {
-    res.redirect("/login");
+    res.render("login");
   }
 });
 
+app.get("/submit", (req, res) => {
+  res.render("submit.ejs");
+});
 app.get(
   "/auth/google",
   passport.authenticate("google", {
@@ -79,6 +82,14 @@ app.post(
   })
 );
 
+app.post(
+  "/login",
+  passport.authenticate("google", {
+    successRedirect: "/secrets",
+    failureRedirect: "/login",
+  })
+);
+
 app.post("/register", async (req, res) => {
   var password = "";
   var email = "";
@@ -88,7 +99,7 @@ app.post("/register", async (req, res) => {
     const pre = await db.query("select * from person where email = ($1)", [
       email,
     ]);
-    console.log(pre);
+
     if (pre.rowCount > 0) {
       res.send("user Already Prsent");
       res.redirect("/");
@@ -106,7 +117,6 @@ app.post("/register", async (req, res) => {
           const user = result.rows[0];
           console.log(user);
           req.login(user, (err) => {
-            console.log("SUccess");
             res.redirect("/secrets");
           });
         }
@@ -117,7 +127,23 @@ app.post("/register", async (req, res) => {
   }
 });
 
+app.post("/submit", async (req, res) => {
+  const secrect = req.body.secret;
+  if (req.isAuthenticated()) {
+    try {
+      await db.query("update person set secrects = $1 where email = $2", [
+        secrect,
+        req.user.email,
+      ]);
+      console.log("success posted a secret");
+    } catch (error) {}
+  } else {
+    
+  }
+});
+
 passport.use(
+  "local",
   new Strategy(async function (username, password, cb) {
     console.log(username);
     try {
@@ -125,30 +151,27 @@ passport.use(
         "select * from person where email = ($1)",
         [username]
       );
-
-      
+      login_user_email = response.rows[0].username;
+      // get_user(login_user_email);
       if (response.rowCount > 0) {
-      const storedHashpass = response.rows[0].password;
-      console.log(storedHashpass);
-      console.log(password);
-      const user = response.rows[0];
-      console.log(user);
+        const storedHashpass = response.rows[0].password;
+
+        const user = response.rows[0];
+
         bcrypt.compare(password, storedHashpass, (err, output) => {
           if (err) {
             console.log("error");
             return cb(err);
           } else {
             if (output === true) {
-              console.log("in true");
               return cb(null, true);
             } else {
-              console.log("in false");
               return cb(null, false);
             }
           }
         });
       } else {
-        return cb(null,false);
+        return cb(null, false);
       }
     } catch (error) {}
   })
@@ -170,19 +193,23 @@ passport.use(
           "Select * from person where email = $1",
           [profile.email]
         );
+
         console.log(response.rowCount);
-        if (response.rowCount > 0) {
-          return cb(null, false);
+        if (response.rows.length !== 0) {
+          return cb(null, response.rows[0], true);
         } else {
           console.log("IN saved google db");
           const new_user = await db.query(
             "insert into person (email,password) Values($1,$2)",
             [profile.email, "google"]
           );
+          login_user_email = new_user.rows[0].email;
           console.log(new_user);
-          return cb(null, true);
+          return cb(null, new_user.rows[0], true);
         }
-      } catch (error) {}
+      } catch (err) {
+        return cb(err);
+      }
     }
   )
 );
