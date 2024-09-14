@@ -6,21 +6,24 @@ import session from "express-session";
 import passport from "passport";
 import { Strategy } from "passport-local";
 import GoogleStrategy from "passport-google-oauth2";
-import env from "dotenv";
+import dotenv from "dotenv";
+import flash from 'express-flash';
 import { access } from "fs";
 import { profile } from "console";
 const app = express();
 const port = 3000;
+dotenv.config();
 
-env.config();
+
 app.use(
   session({
     secret: process.env.hide,
     resave: false,
     saveUninitialized: true,
+    maxAge: 24 * 60 * 60 * 1000
   })
 );
-// Declare session before creating passport very important
+app.use(flash());
 app.use(passport.initialize());
 app.use(passport.session());
 app.set("view engine", "ejs");
@@ -50,8 +53,10 @@ app.get("/register", (req, res) => {
 
 app.get("/secrets", (req, res) => {
   if (req.isAuthenticated()) {
+    console.log("Authenticated")
     res.render("secrets");
   } else {
+    console.log("Not Authenticated")
     res.render("login");
   }
 });
@@ -78,7 +83,8 @@ app.post(
   "/login",
   passport.authenticate("local", {
     successRedirect: "/secrets",
-    failureRedirect: "/login",
+    failureRedirect: "/register",
+    failureFlash: "User Does Not Exist. Please Register."
   })
 );
 
@@ -129,6 +135,8 @@ app.post("/register", async (req, res) => {
 
 app.post("/submit", async (req, res) => {
   const secrect = req.body.secret;
+  console.log(req.user.email);
+  console.log(secrect);
   if (req.isAuthenticated()) {
     try {
       await db.query("update person set secrects = $1 where email = $2", [
@@ -136,23 +144,25 @@ app.post("/submit", async (req, res) => {
         req.user.email,
       ]);
       console.log("success posted a secret");
-    } catch (error) {}
+    } catch (error) {
+      console.log(err)
+    }
   } else {
-    
+    res.redirect('/login');
   }
 });
 
 passport.use(
   "local",
   new Strategy(async function (username, password, cb) {
-    console.log(username);
+    
     try {
       const response = await db.query(
         "select * from person where email = ($1)",
         [username]
       );
-      login_user_email = response.rows[0].username;
-      // get_user(login_user_email);
+      console.log(response.rowCount);
+      
       if (response.rowCount > 0) {
         const storedHashpass = response.rows[0].password;
 
@@ -164,13 +174,14 @@ passport.use(
             return cb(err);
           } else {
             if (output === true) {
-              return cb(null, true);
+              return cb(null, user);
             } else {
               return cb(null, false);
             }
           }
         });
       } else {
+
         return cb(null, false);
       }
     } catch (error) {}
